@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: led-daemon
-  namespace: shrine 
+  namespace: shrine
 spec:
   replicas: 1
   selector:
@@ -18,6 +18,11 @@ spec:
       containers:
       - name: leds
         image: chaos-led:0.1
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
         securityContext:
           privileged: true                 # simplest path to /dev/i2c-1
         volumeMounts:
@@ -29,4 +34,16 @@ spec:
         hostPath:
           path: /dev/i2c-1                 # char device on the Pi host
           type: CharDevice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: led-daemon
+  namespace: shrine
+spec:
+  selector:
+    app: led-daemon
+  ports:
+    - port: 8000
+      targetPort: 8000
 

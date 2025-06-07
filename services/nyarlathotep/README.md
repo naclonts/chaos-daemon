@@ -20,4 +20,4 @@ From another terminal:
 curl -X POST localhost:8086/chat \
   -H 'Content-Type: application/json' \
   -d '{"message":"Hello, Nyarlathotep"}'
-
+```

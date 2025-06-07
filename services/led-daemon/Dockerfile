@@ -10,8 +10,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY app/ ./app/
 COPY led_driver.py .
 
-# Run forever; exit cleanly when K8s sends SIGTERM
-CMD ["python", "led_driver.py"]
+# Run the FastAPI application
+CMD ["python", "-m", "app.main"]
 
