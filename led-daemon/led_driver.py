@@ -25,6 +25,8 @@ def set_led(chan, bright: float):
 
 # ── Graceful shutdown ─────────────────────────────────────────────────────────
 def _shutdown(_sig, _frame):
+    set_led(LED1, 0.0)
+    set_led(LED2, 0.0)
     pca.deinit()
     sys.exit(0)
 
