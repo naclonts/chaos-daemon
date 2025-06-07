@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: led-daemon
+  namespace: shrine 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: led-daemon
+  template:
+    metadata:
+      labels:
+        app: led-daemon
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: chaos-shrine-control-plane   # Pi node
+      containers:
+      - name: leds
+        image: chaos-led:0.1
+        securityContext:
+          privileged: true                 # simplest path to /dev/i2c-1
+        volumeMounts:
+        - name: i2c
+          mountPath: /dev/i2c-1
+          readOnly: false
+      volumes:
+      - name: i2c
+        hostPath:
+          path: /dev/i2c-1                 # char device on the Pi host
+          type: CharDevice
+

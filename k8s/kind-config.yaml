@@ -11,4 +11,6 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
-
+    extraMounts:
+    - hostPath: /dev/i2c-1      # physical Pi device
+      containerPath: /dev/i2c-1 # inside the dockerised node
