@@ -1,0 +1,4 @@
+.lgd*
+__pycache__/
+.env
+.venv/

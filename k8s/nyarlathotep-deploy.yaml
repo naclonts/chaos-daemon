@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nyarlathotep
+  namespace: shrine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nyarlathotep
+  template:
+    metadata:
+      labels:
+        app: nyarlathotep
+    spec:
+      containers:
+      - name: brain
+        image: nyarlathotep:0.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: anthropic-api-key
+              key: api-key
+        - name: ANTHROPIC_MODEL
+          value: "claude-sonnet-4-0"
