@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from mcp.server.fastmcp import FastMCP
-import RPi.GPIO as GPIO
+import board
+import busio
+from adafruit_pca9685 import PCA9685
 import time
 import os
 from typing import Dict
@@ -10,12 +12,19 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# LED configuration
-LED_PIN = int(os.getenv("LED_PIN", "18"))
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(LED_PIN, GPIO.OUT)
-pwm = GPIO.PWM(LED_PIN, 1000)  # 1000 Hz frequency
-pwm.start(0)
+# Initialize I2C and PCA9685
+i2c = busio.I2C(board.SCL, board.SDA)
+pca = PCA9685(i2c)
+pca.frequency = 50  # 50Hz for servos
+
+# LED channels
+LED1 = pca.channels[2]  # Green
+LED2 = pca.channels[3]  # Red
+
+def set_led(chan, bright: float):
+    """Set LED brightness (0.0 to 1.0)"""
+    bright = max(0.0, min(bright, 1.0))
+    chan.duty_cycle = int(bright * 65_535)
 
 app = FastAPI(title="LED Daemon MCP Server")
 mcp = FastMCP("led_daemon")
@@ -65,43 +74,79 @@ def get_current_pattern() -> str:
 def _chaos_wave(parameters: Dict[str, str]):
     """Implement chaos wave pattern"""
     logger.info("Running chaos wave pattern")
-    for i in range(100):
-        pwm.ChangeDutyCycle(i)
-        time.sleep(0.01)
-    for i in range(100, -1, -1):
-        pwm.ChangeDutyCycle(i)
-        time.sleep(0.01)
+    for led in (LED1, LED2):
+        for i in range(101):
+            set_led(led, i / 100.0)
+            time.sleep(0.01)
+        for i in range(100, -1, -1):
+            set_led(led, i / 100.0)
+            time.sleep(0.01)
 
 def _void_pulse(parameters: Dict[str, str]):
     """Implement void pulse pattern"""
     logger.info("Running void pulse pattern")
     for _ in range(5):
-        pwm.ChangeDutyCycle(100)
+        for led in (LED1, LED2):
+            set_led(led, 1.0)
         time.sleep(0.2)
-        pwm.ChangeDutyCycle(0)
+        for led in (LED1, LED2):
+            set_led(led, 0.0)
         time.sleep(0.2)
 
 def _cosmic_spiral(parameters: Dict[str, str]):
     """Implement cosmic spiral pattern"""
     logger.info("Running cosmic spiral pattern")
-    for i in range(0, 100, 2):
-        pwm.ChangeDutyCycle(i)
+    for i in range(0, 101, 2):
+        set_led(LED1, i / 100.0)
+        set_led(LED2, (100 - i) / 100.0)
         time.sleep(0.05)
 
 def _eldritch_flicker(parameters: Dict[str, str]):
     """Implement eldritch flicker pattern"""
     logger.info("Running eldritch flicker pattern")
     for _ in range(10):
-        pwm.ChangeDutyCycle(100)
-        time.sleep(0.1)
-        pwm.ChangeDutyCycle(0)
-        time.sleep(0.1)
+        for led in (LED1, LED2):
+            set_led(led, 1.0)
+            time.sleep(0.1)
+            set_led(led, 0.0)
+            time.sleep(0.1)
 
 # Mount the MCP server at /sse endpoint
-app.mount("/sse", mcp.app)
+app.mount("/sse", mcp.sse_app())
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
     logger.info(f"Starting LED daemon MCP server on port {port}")
+
+    # Initialize LEDs with a startup pattern
+    logger.info("Running startup pattern")
+    try:
+        # Quick pulse on both LEDs
+        for _ in range(2):
+            for led in (LED1, LED2):
+                set_led(led, 1.0)
+            time.sleep(0.1)
+            for led in (LED1, LED2):
+                set_led(led, 0.0)
+            time.sleep(0.1)
+
+        # Fade up green, then red
+        for i in range(101):
+            set_led(LED1, i / 100.0)
+            time.sleep(0.01)
+        for i in range(101):
+            set_led(LED2, i / 100.0)
+            time.sleep(0.01)
+
+        # Fade both down
+        for i in range(100, -1, -1):
+            set_led(LED1, i / 100.0)
+            set_led(LED2, i / 100.0)
+            time.sleep(0.01)
+
+        logger.info("Startup pattern complete")
+    except Exception as e:
+        logger.error(f"Error during startup pattern: {str(e)}", exc_info=True)
+
     uvicorn.run(app, host="0.0.0.0", port=port)
