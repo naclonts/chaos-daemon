@@ -74,7 +74,7 @@ async def chat(req: ChatRequest):
         # Configure MCP server connection
         mcp_servers = [{
             "type": "url",
-            "url": os.getenv("LED_DAEMON_URL", "http://led-daemon:8000/sse"),
+            "url": os.getenv("LED_DAEMON_URL", "http://led-daemon.chaos-shrine.local/sse"),
             "name": "led_daemon"
         }]
         logger.info(f"Configured MCP server URL: {mcp_servers[0]['url']}")

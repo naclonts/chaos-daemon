@@ -46,4 +46,24 @@ spec:
   ports:
     - port: 8000
       targetPort: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: led-daemon-ingress
+  namespace: shrine
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+  - host: led-daemon.chaos-shrine.local
+    http:
+      paths:
+      - path: /sse(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: led-daemon
+            port:
+              number: 8000
 

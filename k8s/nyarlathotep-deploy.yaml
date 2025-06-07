@@ -28,4 +28,4 @@ spec:
         - name: ANTHROPIC_MODEL
           value: "claude-sonnet-4-0"
         - name: LED_DAEMON_URL
-          value: "http://led-daemon.shrine.svc.cluster.local:8000/sse"
+          value: "http://led-daemon.shrine.svc.cluster.local:8000/sse/"
