@@ -1,5 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.routing import Mount, Route
+from mcp.server import Server
 import board
 import busio
 from adafruit_pca9685 import PCA9685
@@ -7,6 +12,7 @@ import time
 import os
 from typing import Dict
 import logging
+import uvicorn
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,8 +32,9 @@ def set_led(chan, bright: float):
     bright = max(0.0, min(bright, 1.0))
     chan.duty_cycle = int(bright * 65_535)
 
-app = FastAPI(title="LED Daemon MCP Server")
+# Initialize FastMCP server for LED tools
 mcp = FastMCP("led_daemon")
+logger.info("Initialized FastMCP server for LED daemon")
 
 @mcp.tool()
 def set_led_pattern(pattern: str, parameters: Dict[str, str] = None) -> str:
@@ -111,11 +118,39 @@ def _eldritch_flicker(parameters: Dict[str, str]):
             set_led(led, 0.0)
             time.sleep(0.1)
 
-# Mount the MCP server at /sse endpoint
-app.mount("/sse", mcp.sse_app())
+def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
+    """Create a Starlette application that can serve the provided mcp server with SSE."""
+    sse = SseServerTransport("/messages/")
+    logger.info("Created SSE server transport")
+
+    async def handle_sse(request: Request) -> None:
+        logger.info("New SSE connection request received")
+        async with sse.connect_sse(
+                request.scope,
+                request.receive,
+                request._send,  # noqa: SLF001
+        ) as (read_stream, write_stream):
+            logger.info("SSE connection established, starting MCP server")
+            await mcp_server.run(
+                read_stream,
+                write_stream,
+                mcp_server.create_initialization_options(),
+            )
+            logger.info("MCP server session completed")
+
+    return Starlette(
+        debug=debug,
+        routes=[
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
+    )
+
+# Create the Starlette app at module level
+mcp_server = mcp._mcp_server  # noqa: WPS437
+app = create_starlette_app(mcp_server, debug=True)
 
 if __name__ == "__main__":
-    import uvicorn
     port = int(os.getenv("PORT", "8000"))
     logger.info(f"Starting LED daemon MCP server on port {port}")
 
