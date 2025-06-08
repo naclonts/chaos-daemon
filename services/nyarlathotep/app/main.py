@@ -72,17 +72,17 @@ async def chat(req: ChatRequest):
         max_toks = req.max_tokens or MAX_TOKENS
 
         # Configure MCP server connection
-        mcp_servers = [{
-            "type": "url",
-            "url": os.getenv("LED_DAEMON_URL", "http://led-daemon.chaos-shrine.local/sse"),
+        tools = [{
+            "type": "mcp",
+            "url": os.getenv("LED_DAEMON_URL", "http://led-daemon.chaos-shrine.local/sse/"),
             "name": "led_daemon"
         }]
-        logger.info(f"Configured MCP server URL: {mcp_servers[0]['url']}")
+        logger.info(f"Configured MCP server URL: {tools[0]['url']}")
 
         try:
             logger.info("Making request to Claude API...")
             resp = await asyncio.to_thread(
-                client.beta.messages.create,
+                client.messages.create,
                 model=MODEL,
                 system=SYSTEM_PROMPT,
                 messages=conversations[conv_id],
@@ -90,8 +90,7 @@ async def chat(req: ChatRequest):
                 temperature=TEMP,
                 top_p=TOP_P,
                 top_k=TOP_K,
-                mcp_servers=mcp_servers,
-                betas=["mcp-client-2025-04-04"]
+                tools=tools
             )
             logger.info("Successfully received response from Claude")
         except Exception as api_error:
