@@ -23,4 +23,4 @@ To chat with the Nyarlathotep language model pod:
 ### Behavior
 
 - Erratic LED manipulation from Raspberry Pi 5 node
-- Portal to eldritch language model
+- Portal to eldritch language model that can control the LEDs via MCP calls

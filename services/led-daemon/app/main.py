@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException
+import asyncio
+import threading
+from typing import Optional
+import random
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
@@ -37,7 +40,7 @@ mcp = FastMCP("led_daemon")
 logger.info("Initialized FastMCP server for LED daemon")
 
 @mcp.tool()
-def set_led_pattern(pattern: str, parameters: Dict[str, str] = None) -> str:
+def set_led_pattern(pattern: str, parameters: Optional[Dict[str, str]]) -> str:
     """
     Set the LED pattern with optional parameters.
     Args:
@@ -47,36 +50,16 @@ def set_led_pattern(pattern: str, parameters: Dict[str, str] = None) -> str:
         A string describing the result
     """
     logger.info(f"Received request to set LED pattern: {pattern}")
-
-    patterns = {
-        "chaos_wave": _chaos_wave,
-        "void_pulse": _void_pulse,
-        "cosmic_spiral": _cosmic_spiral,
-        "eldritch_flicker": _eldritch_flicker
-    }
-
     if pattern not in patterns:
-        logger.error(f"Unknown pattern requested: {pattern}")
         return f"Unknown pattern: {pattern}"
+    pattern_queue.put_nowait((pattern, parameters or {}))
+    logger.info("Queued pattern %s", pattern)
+    return f"Pattern {pattern} queued"
 
-    try:
-        logger.info(f"Executing pattern: {pattern}")
-        patterns[pattern](parameters or {})
-        logger.info(f"Successfully executed pattern: {pattern}")
-        return f"Pattern {pattern} activated successfully"
-    except Exception as e:
-        logger.error(f"Error running pattern {pattern}: {str(e)}", exc_info=True)
-        return f"Error running pattern {pattern}: {str(e)}"
 
 @mcp.tool()
 def get_current_pattern() -> str:
-    """
-    Get the current LED pattern state.
-    Returns:
-        A string describing the current pattern state
-    """
-    logger.info("Received request for current pattern state")
-    return "LED is currently running the last set pattern"
+    return f"LEDs are currently running: {current_pattern_name}"
 
 def _chaos_wave(parameters: Dict[str, str]):
     """Implement chaos wave pattern"""
@@ -118,6 +101,20 @@ def _eldritch_flicker(parameters: Dict[str, str]):
             set_led(led, 0.0)
             time.sleep(0.1)
 
+def _slow_pulse(parameters: Dict[str, str], *, stop_event: threading.Event):
+    """Slow breathing pattern that exits early when stop_event is set."""
+    while not stop_event.is_set():
+        for led in (LED1, LED2):
+            inc = random.randint(1, 5)
+            for up in range(0, 101, inc):
+                if stop_event.is_set(): return
+                set_led(led, up / 100.0); time.sleep(0.05)
+            dec = random.randint(1, 5)
+            for down in range(100, -1, -dec):
+                if stop_event.is_set(): return
+                set_led(led, down / 100.0); time.sleep(0.05)
+
+
 def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlette:
     """Create a Starlette application that can serve the provided mcp server with SSE."""
     sse = SseServerTransport("/messages/")
@@ -149,6 +146,64 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
 # Create the Starlette app at module level
 mcp_server = mcp._mcp_server  # noqa: WPS437
 app = create_starlette_app(mcp_server, debug=True)
+
+# Patterns of LED behavior
+# TODO: move out of global scope
+patterns = {
+    "chaos_wave": _chaos_wave,
+    "void_pulse": _void_pulse,
+    "cosmic_spiral": _cosmic_spiral,
+    "eldritch_flicker": _eldritch_flicker,
+    "slow_pulse": _slow_pulse,
+}
+
+# run async process that constantly runs current_pattern
+# queue carries (pattern_name, parameters) tuples
+# maxsize=1 means “only care about the *latest* request”
+pattern_queue: asyncio.Queue[tuple[str, dict]] = asyncio.Queue()
+idle_stop: threading.Event = threading.Event()   # tells slow_pulse to stop
+current_pattern_name: str = "slow_pulse"
+
+async def pattern_worker() -> None:
+    """Worker that runs LED patterns based on requests in the queue."""
+    global current_pattern_name, idle_stop
+
+    idle_thread: threading.Thread | None = None
+
+    while True:
+        # ── 1. start idle animation when nothing is queued ─────────────
+        if pattern_queue.empty() and (idle_thread is None or not idle_thread.is_alive()):
+            idle_stop.clear()                                    # <-- ensure flag is down
+            idle_thread = threading.Thread(
+                target=_slow_pulse,
+                args=({},),
+                kwargs={"stop_event": idle_stop},
+                daemon=True,
+            )
+            idle_thread.start()
+
+        # ── 2. wait for next queued pattern ───────────────────────────
+        pattern_name, params = await pattern_queue.get()
+
+        # ── 3. interrupt idle immediately ─────────────────────────────
+        idle_stop.set()                 # tell slow_pulse to exit
+        if idle_thread and idle_thread.is_alive():
+            idle_thread.join()          # wait until it’s really gone
+        idle_thread = None              # forget the old thread
+        idle_stop = threading.Event()   # <-- reset the flag object
+
+        # ── 4. run the requested pattern (blocking, in worker thread) ─
+        current_pattern_name = pattern_name
+        await asyncio.to_thread(patterns[pattern_name], params)
+
+        # loop resumes; if the queue is now empty, step 1 restarts idle
+
+
+
+@app.on_event("startup")
+async def _start_pattern_worker() -> None:
+    asyncio.create_task(pattern_worker())
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))

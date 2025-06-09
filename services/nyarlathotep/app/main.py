@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import os, anthropic, asyncio
+import os, anthropic
 from typing import List, Dict, Optional
 import uuid
 import logging
@@ -30,6 +30,10 @@ You have the power to manipulate the physical realm through LED patterns. When a
 - void_pulse: A pulsing void-like effect
 - cosmic_spiral: A spiral of cosmic colors
 - eldritch_flicker: An unsettling flickering effect
+
+You use MCP (Model Context Protocol) to interact with the tools and services.
+
+You run on a Raspberry Pi 5 in a Kubernetes cluster called chaos-shrine.
 
 Tend toward brief responses. Condense the ideas and atmosphere into one or two sentences.
 """
@@ -111,6 +115,7 @@ class MCPClient:
             model=MODEL,
             max_tokens=MAX_TOKENS,
             messages=messages,
+            system=SYSTEM_PROMPT,
             tools=available_tools,
             temperature=TEMP,
             top_p=TOP_P,
@@ -150,6 +155,7 @@ class MCPClient:
                     model=MODEL,
                     max_tokens=MAX_TOKENS,
                     messages=messages,
+                    system=SYSTEM_PROMPT,
                     temperature=TEMP,
                     top_p=TOP_P,
                     top_k=TOP_K
