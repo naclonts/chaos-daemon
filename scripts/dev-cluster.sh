@@ -21,12 +21,14 @@ kubectl create ns shrine || true
 kubectl create ns valve  || true
 
 # LED Daemon
-docker build -t chaos-led:0.1 "$BASE_DIR/services/led-daemon"
+nice -n 15 ionice -c2 -n7 \
+  docker build -t chaos-led:0.1 "$BASE_DIR/services/led-daemon"
 kind load docker-image chaos-led:0.1 --name $CLUSTER
 kubectl apply -f "$BASE_DIR/k8s/led-daemon.yaml"
 
 # Nyarlathotep LLM messenger
-docker build -t nyarlathotep:0.1 "$BASE_DIR/services/nyarlathotep"
+nice -n 15 ionice -c2 -n7 \
+  docker build -t nyarlathotep:0.1 "$BASE_DIR/services/nyarlathotep"
 kind load docker-image nyarlathotep:0.1 --name $CLUSTER
 kubectl create secret generic anthropic-api-key \
   --namespace shrine \
