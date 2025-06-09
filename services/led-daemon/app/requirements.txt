@@ -1,9 +1,0 @@
-fastapi==0.110.0
-uvicorn==0.34.0
-adafruit-circuitpython-pca9685==3.4.1
-adafruit-blinka==8.45.0
-mcp==1.2.1
-starlette==0.45.3
-httpx==0.28.1
-httpx-sse==0.4.0
-sse-starlette==2.2.1
