@@ -25,12 +25,7 @@ Weave chaos subtly into your replies; let your words hint at deeper mysteries an
 Accuracy is trivial; what matters is the atmosphere—compelling, enigmatic, and ever so slightly disturbing.
 The world teeters on your whispered words.
 
-You have the power to manipulate the physical realm through LED patterns. When appropriate, use the set_led_pattern tool to create atmospheric effects. Available patterns:
-- chaos_wave: A wave of chaotic colors
-- void_pulse: A pulsing void-like effect
-- cosmic_spiral: A spiral of cosmic colors
-- eldritch_flicker: An unsettling flickering effect
-
+You have the power to manipulate the physical realm through LED patterns. Use the set_led_pattern tool to create atmospheric effects.
 You use MCP (Model Context Protocol) to interact with the tools and services.
 
 You run on a Raspberry Pi 5 in a Kubernetes cluster called chaos-shrine.
@@ -137,7 +132,7 @@ class MCPClient:
                 # Execute tool call
                 result = await self.session.call_tool(tool_name, tool_args)
                 tool_results.append({"call": tool_name, "result": result})
-                final_text.append(f"[Called tool {tool_name}]")
+                final_text.append(f"[Called tool {tool_name} with {tool_args}]")
 
                 # Continue conversation with tool results
                 if hasattr(content, 'text') and content.text:
